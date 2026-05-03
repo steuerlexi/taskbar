@@ -67,7 +67,7 @@ pub fn run() {
                     panel.show();
                 } else {
                     // Create additional panels for other monitors using PanelBuilder
-                    let panel = PanelBuilder::<_, TaskbarPanel>::new(app, &label)
+                    let panel = PanelBuilder::<_, TaskbarPanel>::new(app.handle(), &label)
                         .url(WebviewUrl::App("index.html".into()))
                         .title("Taskbar")
                         .level(PanelLevel::Floating)
@@ -78,13 +78,13 @@ pub fn run() {
                                 .full_screen_auxiliary(),
                         )
                         .size(tauri::Size::Logical(tauri::LogicalSize::new(
-                            monitor.size.width as f64 / scale,
+                            monitor.size().width as f64 / scale,
                             taskbar_height,
                         )))
                         .position(tauri::Position::Logical(tauri::LogicalPosition::new(
-                            monitor.position.x as f64 / scale,
-                            monitor.position.y as f64 / scale
-                                + monitor.size.height as f64 / scale
+                            monitor.position().x as f64 / scale,
+                            monitor.position().y as f64 / scale
+                                + monitor.size().height as f64 / scale
                                 - taskbar_height,
                         )))
                         .build()?;
