@@ -23,12 +23,17 @@ echo "Rust: $(cargo --version)"
 
 # Check Node.js
 if ! command -v node &>/dev/null; then
-  echo "Installing Node.js..."
-  curl -fsSL https://fnm.vercel.app/install | bash -s -- --install-version "22"
-  source "$HOME/.local/share/fnm/fnm.sh" 2>/dev/null || source "$HOME/.fnm/fnm.sh" 2>/dev/null || true
-  eval "$(fnm env)" 2>/dev/null || true
+  echo "Installing Node.js via Homebrew..."
+  if ! command -v brew &>/dev/null; then
+    echo "Installing Homebrew first..."
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    eval "$(/opt/homebrew/bin/brew shellenv)" 2>/dev/null || eval "$(/usr/local/bin/brew shellenv)" 2>/dev/null || true
+  fi
+  brew install node@22
+  brew link node@22 2>/dev/null || true
 fi
 echo "Node: $(node --version)"
+echo "npm: $(npm --version)"
 
 # Navigate to project
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
