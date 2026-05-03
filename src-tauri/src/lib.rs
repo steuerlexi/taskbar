@@ -9,7 +9,6 @@ pub use config::load_config;
 
 use std::sync::Mutex;
 use tauri::{Manager, WebviewWindow};
-use objc2_app_kit::NSWindowCollectionBehavior;
 use tauri_nspanel::WebviewWindowExt;
 
 pub fn run() {
@@ -83,15 +82,15 @@ pub fn run() {
 fn setup_panel(window: &WebviewWindow) {
     let panel = window.to_panel().unwrap();
 
-    const NS_FLOAT_WINDOW_LEVEL: i32 = 4;
-    panel.set_level(NS_FLOAT_WINDOW_LEVEL);
+    // NSFloatingWindowLevel = 4
+    panel.set_level(4);
 
-    const NS_WINDOW_STYLE_MASK_NON_ACTIVATING_PANEL: i32 = 1 << 7;
-    panel.set_style_mask(NS_WINDOW_STYLE_MASK_NON_ACTIVATING_PANEL);
+    // Non-activating panel: utility window that doesn't activate the app
+    panel.set_becomes_key_only_if_needed(true);
 
-    panel.set_collection_behaviour(
-        NSWindowCollectionBehavior::NSWindowCollectionBehaviorFullScreenAuxiliary
-            | NSWindowCollectionBehavior::NSWindowCollectionBehaviorCanJoinAllSpaces,
+    panel.set_collection_behavior(
+        objc2_app_kit::NSWindowCollectionBehavior::NSWindowCollectionBehaviorFullScreenAuxiliary
+            | objc2_app_kit::NSWindowCollectionBehavior::NSWindowCollectionBehaviorCanJoinAllSpaces,
     );
 }
 

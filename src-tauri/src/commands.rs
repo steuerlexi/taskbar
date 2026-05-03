@@ -1,8 +1,8 @@
 use crate::config::AppConfig;
 use crate::macos;
+use objc2_app_kit::NSWorkspace;
 use std::sync::Mutex;
 use tauri::State;
-use objc2_app_kit::NSWorkspace;
 
 pub struct AppState {
     pub config: Mutex<AppConfig>,
@@ -27,13 +27,13 @@ pub fn launch_app(bundle_id: String) -> bool {
 pub fn quit_app(bundle_id: String) -> bool {
     let apps = crate::macos::get_running_apps();
     if let Some(app) = apps.iter().find(|a| a.bundle_id == bundle_id) {
-        let workspace = unsafe { NSWorkspace::sharedWorkspace() };
-        let running_apps = unsafe { workspace.runningApplications() };
-        let count = unsafe { running_apps.count() };
+        let workspace = NSWorkspace::sharedWorkspace();
+        let running_apps = workspace.runningApplications();
+        let count = running_apps.count();
         for i in 0..count {
-            let running_app = unsafe { running_apps.objectAtIndex(i) };
-            if unsafe { running_app.processIdentifier() } == app.pid {
-                let _ = unsafe { running_app.terminate() };
+            let running_app = running_apps.objectAtIndex(i);
+            if running_app.processIdentifier() == app.pid {
+                let _ = running_app.terminate();
                 return true;
             }
         }

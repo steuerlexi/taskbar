@@ -10,27 +10,29 @@ pub struct RunningApp {
 }
 
 pub fn get_running_apps() -> Vec<RunningApp> {
-    let workspace = unsafe { NSWorkspace::sharedWorkspace() };
-    let apps = unsafe { workspace.runningApplications() };
+    let workspace = NSWorkspace::sharedWorkspace();
+    let apps = workspace.runningApplications();
 
     let mut result = Vec::new();
-    let count = unsafe { apps.count() };
+    let count = apps.count();
 
     for i in 0..count {
-        let app = unsafe { apps.objectAtIndex(i) };
-        let bundle_id = unsafe { app.bundleIdentifier() }
-            .map(|s| unsafe { s.to_string() })
+        let app = apps.objectAtIndex(i);
+        let bundle_id = app
+            .bundleIdentifier()
+            .map(|s| s.to_string())
             .unwrap_or_default();
-        let name = unsafe { app.localizedName() }
-            .map(|s| unsafe { s.to_string() })
+        let name = app
+            .localizedName()
+            .map(|s| s.to_string())
             .unwrap_or_default();
 
         if bundle_id.is_empty() {
             continue;
         }
 
-        let pid = unsafe { app.processIdentifier() };
-        let is_active = unsafe { app.isActive() };
+        let pid = app.processIdentifier();
+        let is_active = app.isActive();
 
         result.push(RunningApp {
             bundle_id,
@@ -44,7 +46,7 @@ pub fn get_running_apps() -> Vec<RunningApp> {
 }
 
 pub fn launch_app(bundle_id: &str) -> bool {
-    // Use `open -b` which is simpler and avoids objc2-app-kit API uncertainty
+    // Use `open -b` which is simpler than NSWorkspace launch API
     std::process::Command::new("open")
         .args(["-b", bundle_id])
         .spawn()
@@ -52,22 +54,24 @@ pub fn launch_app(bundle_id: &str) -> bool {
 }
 
 pub fn get_frontmost_app() -> Option<RunningApp> {
-    let workspace = unsafe { NSWorkspace::sharedWorkspace() };
-    let app = unsafe { workspace.frontmostApplication() }?;
+    let workspace = NSWorkspace::sharedWorkspace();
+    let app = workspace.frontmostApplication()?;
 
-    let bundle_id = unsafe { app.bundleIdentifier() }
-        .map(|s| unsafe { s.to_string() })
+    let bundle_id = app
+        .bundleIdentifier()
+        .map(|s| s.to_string())
         .unwrap_or_default();
-    let name = unsafe { app.localizedName() }
-        .map(|s| unsafe { s.to_string() })
+    let name = app
+        .localizedName()
+        .map(|s| s.to_string())
         .unwrap_or_default();
 
     if bundle_id.is_empty() {
         return None;
     }
 
-    let pid = unsafe { app.processIdentifier() };
-    let is_active = unsafe { app.isActive() };
+    let pid = app.processIdentifier();
+    let is_active = app.isActive();
 
     Some(RunningApp {
         bundle_id,
