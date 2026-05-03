@@ -8,11 +8,22 @@ pub use commands::AppState;
 pub use config::load_config;
 
 use std::sync::Mutex;
-use tauri::{Manager, WebviewWindow};
-use tauri_nspanel::WebviewWindowExt;
+use tauri::{Manager, WebviewUrl};
+use tauri_nspanel::{
+    tauri_panel, CollectionBehavior, PanelBuilder, PanelLevel, StyleMask, WebviewWindowExt,
+};
 
-// Define a panel type for the taskbar using tauri-nspanel's macro
-tauri_nspanel::tauri_panel!(TaskbarPanel);
+// Define the taskbar panel class
+tauri_panel! {
+    panel!(TaskbarPanel {
+        config: {
+            can_become_key_window: false,
+            can_become_main_window: false,
+            becomes_key_only_if_needed: true,
+            is_floating_panel: true
+        }
+    })
+}
 
 pub fn run() {
     let app_config = load_config();
@@ -38,33 +49,48 @@ pub fn run() {
             let monitors: Vec<_> = app.available_monitors().unwrap().into_iter().collect();
 
             for (i, monitor) in monitors.iter().enumerate() {
+                let label = format!("taskbar-{}", i);
+                let scale = monitor.scale_factor();
+                let taskbar_height: f64 = 56.0;
+
                 if i == 0 {
-                    // First window already exists from config
-                    let window: WebviewWindow = app.get_webview_window("taskbar-0").unwrap();
-                    setup_panel(&window);
-                    position_window_on_monitor(&window, &monitor);
+                    // First window already exists from Tauri config
+                    let window: tauri::WebviewWindow = app.get_webview_window("taskbar-0").unwrap();
+
+                    // Position the window before converting to panel
+                    position_window_on_monitor(&window, &monitor, taskbar_height);
+
                     let panel = window.to_panel::<TaskbarPanel>().unwrap();
+                    panel.set_alpha_value(1.0);
+                    panel.set_has_shadow(false);
+                    panel.set_opaque(false);
                     panel.show();
                 } else {
-                    // Create additional windows for other monitors
-                    let label = format!("taskbar-{}", i);
-                    let window = tauri::WebviewWindowBuilder::new(
-                        app,
-                        &label,
-                        tauri::WebviewUrl::App("index.html".into()),
-                    )
-                    .title("Taskbar")
-                    .decorations(false)
-                    .transparent(true)
-                    .always_on_top(true)
-                    .skip_taskbar(true)
-                    .visible(false)
-                    .resizable(false)
-                    .build()?;
-
-                    setup_panel(&window);
-                    position_window_on_monitor(&window, &monitor);
-                    let panel = window.to_panel::<TaskbarPanel>().unwrap();
+                    // Create additional panels for other monitors using PanelBuilder
+                    let panel = PanelBuilder::<_, TaskbarPanel>::new(app, &label)
+                        .url(WebviewUrl::App("index.html".into()))
+                        .title("Taskbar")
+                        .level(PanelLevel::Floating)
+                        .style_mask(StyleMask::empty().borderless())
+                        .collection_behavior(
+                            CollectionBehavior::new()
+                                .can_join_all_spaces()
+                                .full_screen_auxiliary(),
+                        )
+                        .size(tauri::Size::Logical(tauri::LogicalSize::new(
+                            monitor.size.width as f64 / scale,
+                            taskbar_height,
+                        )))
+                        .position(tauri::Position::Logical(tauri::LogicalPosition::new(
+                            monitor.position.x as f64 / scale,
+                            monitor.position.y as f64 / scale
+                                + monitor.size.height as f64 / scale
+                                - taskbar_height,
+                        )))
+                        .build()?;
+                    panel.set_alpha_value(1.0);
+                    panel.set_has_shadow(false);
+                    panel.set_opaque(false);
                     panel.show();
                 }
             }
@@ -82,27 +108,10 @@ pub fn run() {
         .expect("error while running tauri application");
 }
 
-fn setup_panel(window: &WebviewWindow) {
-    let panel = window.to_panel::<TaskbarPanel>().unwrap();
-
-    // NSFloatingWindowLevel = 4
-    panel.set_level(4);
-
-    // Non-activating panel: doesn't steal focus from other apps
-    panel.set_becomes_key_only_if_needed(true);
-
-    // Collection behavior: show on all spaces and during fullscreen
-    // NSWindowCollectionBehaviorCanJoinAllSpaces = 1 << 0 = 0x01
-    // NSWindowCollectionBehaviorFullScreenAuxiliary = 1 << 9 = 0x200
-    let behavior = objc2_app_kit::NSWindowCollectionBehavior::from_bits_truncate(0x01 | 0x200);
-    panel.set_collection_behavior(behavior);
-}
-
-fn position_window_on_monitor(window: &WebviewWindow, monitor: &tauri::Monitor) {
+fn position_window_on_monitor(window: &tauri::WebviewWindow, monitor: &tauri::Monitor, taskbar_height: f64) {
     let size = monitor.size();
     let position = monitor.position();
     let scale = monitor.scale_factor();
-    let taskbar_height: f64 = 56.0;
 
     let y = position.y + size.height as i32 - (taskbar_height * scale) as i32;
 
