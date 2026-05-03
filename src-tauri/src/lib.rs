@@ -46,28 +46,61 @@ pub fn run() {
         .setup(|app| {
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
-            let monitors: Vec<_> = app.available_monitors().unwrap().into_iter().collect();
+            let monitors: Vec<_> = match app.available_monitors() {
+                Ok(m) => m.into_iter().collect(),
+                Err(e) => {
+                    eprintln!("Failed to get monitors: {e}");
+                    return Ok(());
+                }
+            };
+
+            if monitors.is_empty() {
+                eprintln!("No monitors found");
+                return Ok(());
+            }
+
+            let taskbar_height: f64 = 56.0;
 
             for (i, monitor) in monitors.iter().enumerate() {
                 let label = format!("taskbar-{}", i);
                 let scale = monitor.scale_factor();
-                let taskbar_height: f64 = 56.0;
+                let size = monitor.size();
+                let position = monitor.position();
+
+                // Compute logical coordinates for panel placement
+                let logical_width = size.width as f64 / scale;
+                let logical_x = position.x as f64 / scale;
+                let logical_y = position.y as f64 / scale + size.height as f64 / scale - taskbar_height;
 
                 if i == 0 {
-                    // First window already exists from Tauri config
-                    let window: tauri::WebviewWindow = app.get_webview_window("taskbar-0").unwrap();
+                    // First window already exists from Tauri config — convert it to a panel
+                    let window = match app.get_webview_window("taskbar-0") {
+                        Some(w) => w,
+                        None => {
+                            eprintln!("Failed to get primary window");
+                            continue;
+                        }
+                    };
 
-                    // Position the window before converting to panel
-                    position_window_on_monitor(&window, &monitor, taskbar_height);
+                    // Position the window first (while it's still a normal window)
+                    let y = position.y + size.height as i32 - (taskbar_height * scale) as i32;
+                    let _ = window.set_position(tauri::PhysicalPosition::new(position.x, y));
+                    let _ = window.set_size(tauri::PhysicalSize::new(size.width, (taskbar_height * scale) as u32));
 
-                    let panel = window.to_panel::<TaskbarPanel>().unwrap();
+                    let panel = match window.to_panel::<TaskbarPanel>() {
+                        Ok(p) => p,
+                        Err(e) => {
+                            eprintln!("Failed to convert window to panel: {e}");
+                            continue;
+                        }
+                    };
                     panel.set_alpha_value(1.0);
                     panel.set_has_shadow(false);
                     panel.set_opaque(false);
                     panel.show();
                 } else {
                     // Create additional panels for other monitors using PanelBuilder
-                    let panel = PanelBuilder::<_, TaskbarPanel>::new(app.handle(), &label)
+                    let panel = match PanelBuilder::<_, TaskbarPanel>::new(app.handle(), &label)
                         .url(WebviewUrl::App("index.html".into()))
                         .title("Taskbar")
                         .level(PanelLevel::Floating)
@@ -78,16 +111,21 @@ pub fn run() {
                                 .full_screen_auxiliary(),
                         )
                         .size(tauri::Size::Logical(tauri::LogicalSize::new(
-                            monitor.size().width as f64 / scale,
+                            logical_width,
                             taskbar_height,
                         )))
                         .position(tauri::Position::Logical(tauri::LogicalPosition::new(
-                            monitor.position().x as f64 / scale,
-                            monitor.position().y as f64 / scale
-                                + monitor.size().height as f64 / scale
-                                - taskbar_height,
+                            logical_x,
+                            logical_y,
                         )))
-                        .build()?;
+                        .build()
+                    {
+                        Ok(p) => p,
+                        Err(e) => {
+                            eprintln!("Failed to build panel for monitor {i}: {e}");
+                            continue;
+                        }
+                    };
                     panel.set_alpha_value(1.0);
                     panel.set_has_shadow(false);
                     panel.set_opaque(false);
@@ -106,15 +144,4 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
-}
-
-fn position_window_on_monitor(window: &tauri::WebviewWindow, monitor: &tauri::Monitor, taskbar_height: f64) {
-    let size = monitor.size();
-    let position = monitor.position();
-    let scale = monitor.scale_factor();
-
-    let y = position.y + size.height as i32 - (taskbar_height * scale) as i32;
-
-    let _ = window.set_position(tauri::PhysicalPosition::new(position.x, y));
-    let _ = window.set_size(tauri::PhysicalSize::new(size.width, (taskbar_height * scale) as u32));
 }
