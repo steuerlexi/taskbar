@@ -9,7 +9,8 @@ pub use config::load_config;
 
 use std::sync::Mutex;
 use tauri::{Manager, WebviewWindow};
-use tauri_nspanel::{cocoa::appkit::NSWindowCollectionBehavior, WebviewWindowExt};
+use objc2_app_kit::NSWindowCollectionBehavior;
+use tauri_nspanel::WebviewWindowExt;
 
 pub fn run() {
     let app_config = load_config();
