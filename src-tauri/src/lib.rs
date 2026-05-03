@@ -11,6 +11,9 @@ use std::sync::Mutex;
 use tauri::{Manager, WebviewWindow};
 use tauri_nspanel::WebviewWindowExt;
 
+// Define a panel type for the taskbar using tauri-nspanel's macro
+tauri_nspanel::tauri_panel!(TaskbarPanel);
+
 pub fn run() {
     let app_config = load_config();
 
@@ -40,7 +43,7 @@ pub fn run() {
                     let window: WebviewWindow = app.get_webview_window("taskbar-0").unwrap();
                     setup_panel(&window);
                     position_window_on_monitor(&window, &monitor);
-                    let panel = window.to_panel().unwrap();
+                    let panel = window.to_panel::<TaskbarPanel>().unwrap();
                     panel.show();
                 } else {
                     // Create additional windows for other monitors
@@ -61,7 +64,7 @@ pub fn run() {
 
                     setup_panel(&window);
                     position_window_on_monitor(&window, &monitor);
-                    let panel = window.to_panel().unwrap();
+                    let panel = window.to_panel::<TaskbarPanel>().unwrap();
                     panel.show();
                 }
             }
@@ -80,18 +83,19 @@ pub fn run() {
 }
 
 fn setup_panel(window: &WebviewWindow) {
-    let panel = window.to_panel().unwrap();
+    let panel = window.to_panel::<TaskbarPanel>().unwrap();
 
     // NSFloatingWindowLevel = 4
     panel.set_level(4);
 
-    // Non-activating panel: utility window that doesn't activate the app
+    // Non-activating panel: doesn't steal focus from other apps
     panel.set_becomes_key_only_if_needed(true);
 
-    panel.set_collection_behavior(
-        objc2_app_kit::NSWindowCollectionBehavior::NSWindowCollectionBehaviorFullScreenAuxiliary
-            | objc2_app_kit::NSWindowCollectionBehavior::NSWindowCollectionBehaviorCanJoinAllSpaces,
-    );
+    // Collection behavior: show on all spaces and during fullscreen
+    // NSWindowCollectionBehaviorCanJoinAllSpaces = 1 << 0 = 0x01
+    // NSWindowCollectionBehaviorFullScreenAuxiliary = 1 << 9 = 0x200
+    let behavior = objc2_app_kit::NSWindowCollectionBehavior::from_bits_truncate(0x01 | 0x200);
+    panel.set_collection_behavior(behavior);
 }
 
 fn position_window_on_monitor(window: &WebviewWindow, monitor: &tauri::Monitor) {
